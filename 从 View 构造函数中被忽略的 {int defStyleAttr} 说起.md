@@ -8,7 +8,7 @@
 
 使用上面这几个步骤，根据自己的具体逻辑，一个自定义 View 就可以简单使用了。现在要关注的是一个不起眼的家伙，构造函数中的 ```defStyleAttr``` 参数。
 
-## 实例
+## 探寻
 
 首先看看 Button 源码中的几个构造方法：
 
@@ -41,7 +41,7 @@ public Button(Context context, AttributeSet attrs, int defStyleAttr, int defStyl
 An attribute in the current theme that contains a reference to a style resource that supplies default values for the view. Can be 0 to not look for defaults.
 ```
 
-大意是：当前主题中一个包含 style 资源引用(Style 中有该 View 默认属性值集合)的值。如果是 0 则不会寻找默认属性值。
+大意是：当前主题中一个包含 style 资源引用(Style 中有该 View 默认属性值集合)的值，这个引用对应的资源属性/值会填充 attrs 中没有声明的属性。如果是 0 则不会寻找默认属性值填充。
 
 对上面的解释进行验证，分别使用第二个和第三个构造方法：
 
@@ -52,4 +52,95 @@ button1.setText("button1");
 button2.setText("button2");
 ```
 
-运行可以发现 button1 有 Button 预置的属性，而 button2 没有。
+效果：
+
+<img src="https://raw.githubusercontent.com/whilu/lujun.co-storge/master/image/781494423801_.pic.jpg" width="311" height="57" />
+
+运行可以发现 button1 有 Button 预置的一些基础属性(如背景、点击效果等)，而 button2 没有。其中 button1 的预置属性从 ```com.android.internal.R.attr.buttonStyle``` 中获得。
+
+更近一步，我们知道了这个参数是为一个 View 提供基础的属性，下面尝试实现这样的功能：
+
+- 定义一个 attribute
+
+```xml
+<resources>
+    <declare-styleable name="AppTheme">
+        <attr name="myButtonStyle" format="reference" />
+    </declare-styleable>
+</resources>
+```
+
+- 在我们当前的 Theme 中，为上面定义的 attribute 添加一个 style
+
+```xml
+<resources>
+    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+        <item name="myButtonStyle">@style/MyButtonStyle</item>
+    </style>
+    <style name="MyButtonStyle" parent="@style/Widget.AppCompat.Button">
+        <item name="android:textColor">@android:color/holo_red_dark</item>
+    </style>
+</resources>
+```
+
+其中 style 继承自 Button style，但修改了 Button 文字颜色为红色。
+
+- 在自定义 View 中使用自定义 attribute
+
+```java
+public class MyButton extends Button {
+
+    public MyButton(Context context) {
+        this(context, null);
+    }
+
+    public MyButton(Context context, AttributeSet attrs) {
+        this(context, attrs, R.attr.myButtonStyle);
+    }
+
+    public MyButton(Context context, AttributeSet attrs, int defStyleAttr) {
+        this(context, attrs, defStyleAttr, 0);
+    }
+
+    public MyButton(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+        super(context, attrs, defStyleAttr, defStyleRes);
+    }
+}
+```
+
+最后在 .xml 中使用 MyButton，由于默认填充使用了 Button style(文字颜色被修改为红色)，所以样式如下：
+
+<img src="https://raw.githubusercontent.com/whilu/lujun.co-storge/master/image/811494434509_.pic.jpg" width="196" height="82" />
+
+看完 ```defStyleAttr```，第四个构造方法中的 ```defStyleRes``` 参数又引起了我们的注意，进入 View 的源码，同样可以看到对于该参数的解释：
+
+```
+A resource identifier of a style resource that supplies default values for the view, used only if defStyleAttr is 0 or can not be found in the theme. Can be 0 to not look for defaults.
+```
+
+大意是：为 View 提供默认值的一个样式资源标识符(不局限于当前 Theme 中)，仅在 ```defStyleAttr``` 为 0 或提供的样式资源无法找到的时候使用。如果设置为 0 无效。
+
+继续看：
+
+```java
+Button button3 = new Button(this, null, 0, 0);
+Button button4 = new Button(this, null, 0, android.R.style.Widget_Button_Small);
+button3.setText("button3");
+button4.setText("button4");
+```
+
+效果(连同第一、二种情况对比)：
+
+<img src="https://raw.githubusercontent.com/whilu/lujun.co-storge/master/image/791494427270_.pic.jpg" width="312" height="109" />
+
+这里设置 defStyleRes 为  ```android.R.style.Widget_Button_Small``` style，相比默认的 Button style 有区别。
+
+## 分析
+
+## 参考
+
+- [http://blog.danlew.net/2016/07/19/a-deep-dive-into-android-view-constructors/](http://blog.danlew.net/2016/07/19/a-deep-dive-into-android-view-constructors/)
+
+
+
+

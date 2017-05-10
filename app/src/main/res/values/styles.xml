@@ -6,6 +6,17 @@
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
+        <item name="myButtonStyle">@style/MyButtonStyle</item>
     </style>
+
+    <style name="MyButtonStyle" parent="@style/Widget.AppCompat.Button">
+        <item name="android:textColor">@android:color/holo_red_dark</item>
+    </style>
+
+    <declare-styleable name="AppTheme">
+
+        <attr name="myButtonStyle" format="reference" />
+
+    </declare-styleable>
 
 </resources>
