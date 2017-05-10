@@ -37,9 +37,7 @@ public Button(Context context, AttributeSet attrs, int defStyleAttr, int defStyl
 
 这里重点关注第二个构造方法。方法的第一参数是 Context，第二个参数是我们自定义属性的集合，那么第三个参数是什么？进入源码继续看，最后来到 View 的代码，看到对于该参数的解释：
 
-```
-An attribute in the current theme that contains a reference to a style resource that supplies default values for the view. Can be 0 to not look for defaults.
-```
+> An attribute in the current theme that contains a reference to a style resource that supplies default values for the view. Can be 0 to not look for defaults.
 
 大意是：当前主题中一个包含 style 资源引用(Style 中有该 View 默认属性值集合)的值，这个引用对应的资源属性/值会填充 attrs 中没有声明的属性。如果是 0 则不会寻找默认属性值填充。
 
@@ -114,9 +112,7 @@ public class MyButton extends Button {
 
 看完 ```defStyleAttr```，第四个构造方法中的 ```defStyleRes``` 参数又引起了我们的注意，进入 View 的源码，同样可以看到对于该参数的解释：
 
-```
-A resource identifier of a style resource that supplies default values for the view, used only if defStyleAttr is 0 or can not be found in the theme. Can be 0 to not look for defaults.
-```
+> A resource identifier of a style resource that supplies default values for the view, used only if defStyleAttr is 0 or can not be found in the theme. Can be 0 to not look for defaults.
 
 大意是：为 View 提供默认值的一个样式资源标识符(不局限于当前 Theme 中)，仅在 ```defStyleAttr``` 为 0 或提供的样式资源无法找到的时候使用。如果设置为 0 无效。
 
