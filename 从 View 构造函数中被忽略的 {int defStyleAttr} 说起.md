@@ -149,7 +149,7 @@ TextView
 
 ```java
 public TextView(Context context, @Nullable AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-	super(context, attrs, defStyleAttr, defStyleRes);
+    super(context, attrs, defStyleAttr, defStyleRes);
     // ...
 }
 ```
@@ -158,9 +158,9 @@ View
 
 ```java
 public View(Context context, @Nullable AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-	// ...
-	final TypedArray a = context.obtainStyledAttributes(attrs, com.android.internal.R.styleable.View, defStyleAttr, defStyleRes);
-	// ...
+    // ...
+    final TypedArray a = context.obtainStyledAttributes(attrs, com.android.internal.R.styleable.View, defStyleAttr, defStyleRes);
+    // ...
 }
 ```
 
@@ -168,7 +168,7 @@ Context
 
 ```java
 public final TypedArray obtainStyledAttributes(AttributeSet set, @StyleableRes int[] attrs, @AttrRes int defStyleAttr, @StyleRes int defStyleRes) {
-	return getTheme().obtainStyledAttributes(set, attrs, defStyleAttr, defStyleRes);
+    return getTheme().obtainStyledAttributes(set, attrs, defStyleAttr, defStyleRes);
 }
 ```
 
@@ -176,7 +176,7 @@ Resource.Theme
 
 ```java
 public TypedArray obtainStyledAttributes(AttributeSet set, @StyleableRes int[] attrs, @AttrRes int defStyleAttr, @StyleRes int defStyleRes) {
-	return mThemeImpl.obtainStyledAttributes(this, set, attrs, defStyleAttr, defStyleRes);
+    return mThemeImpl.obtainStyledAttributes(this, set, attrs, defStyleAttr, defStyleRes);
 }
 ```
 
