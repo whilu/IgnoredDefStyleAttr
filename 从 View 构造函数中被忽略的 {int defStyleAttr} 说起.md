@@ -133,6 +133,8 @@ button4.setText("button4");
 
 ## 分析
 
+### attribute 值的确定过程分析
+
 利用 Context 的 ```obtainStyledAttributes``` 方法，可以将属性值取回到一个 TypedArray 中([为什么使用 TypedArray](http://blog.csdn.net/lmj623565791/article/details/45022631))。
 
 一个 attribute 值的确定过程大致如下：
@@ -241,7 +243,155 @@ static jboolean android_content_AssetManager_applyStyle(JNIEnv* env, jobject cla
 
 到此，attribute 值的查找过程结束。attribute 值的确定是按照一系列规则来最终确定的。
 
-接下来，我们看看 TypedArray 这个类。
+### 看看 TypedArray 这个类
+
+使用 TypedArray 类可以帮助我们简化获取 attribute 值的流程。类介绍也表明了其作用：
+
+>ontainer for an array of values that were retrieved with ```Resources.Theme#obtainStyledAttributes``` or ```Resources#obtainAttributes```. ** Be sure to call ```recycle``` when done with them. **
+>
+>The indices used to retrieve values from this structure correspond to the positions of the attributes given to obtainStyledAttributes.
+
+注意上面标重的一句话：用完之后必须调用 ```recycle``` 方法。对，我们通常都会这么做，但是为什么要这么做？ 查看这个方法源码：
+
+```java
+public void recycle() {
+    if (mRecycled) {
+        throw new RuntimeException(toString() + " recycled twice!");
+    }
+
+    mRecycled = true;
+
+    // These may have been set by the client.
+    mXml = null;
+    mTheme = null;
+    mAssets = null;
+
+    mResources.mTypedArrayPool.release(this);
+}
+```
+
+其中主要就是释放了相应的资源，注意看到 ```mResources.mTypedArrayPool.release(this);``` 这一行代码，mTypedArrayPool 是 Resource 类中的一个同步对象(存储 TypedArray 对象)池，这里使用了 Pool 来进行优化。
+
+既然是用了 Pool，那就肯定有获取对象的方法，焦点来到 ```obtain``` 方法：
+
+```java
+static TypedArray obtain(Resources res, int len) {
+    final TypedArray attrs = res.mTypedArrayPool.acquire();
+    if (attrs != null) {
+        // 重置从 Pool 中获取到的对象
+        return attrs;
+    }
+	// 如果对象池是空，返回一个新对象
+    return new TypedArray(res, new int[len*AssetManager.STYLE_NUM_ENTRIES], new int[1+len], len);
+}
+```
+
+简单总结这两个方法如下：
+
+- ```recycle``` 方法就相当于 Pool 中的 release，用于归还对象到 Pool 中；
+- ```obtain``` 方法就相当于 Pool 中的 acquire，用于从 Pool 中请求对象。
+
+对于 mTypedArrayPool 的大小 Android 默认是 5。对象池不能太大也不能太小，太大可能造成内存占用，太小可能造成无效对象或有无对象池无明显效果等问题。具体大小的设置，是需要根据具体的场景结合数据分析得到。
+
+Android 应用程序就是由大量 View 构成，因此 View 成了最经常使用的对象。一个 View 创建过程中有大量的 attributes 需要设置，Android 使用了 TypedArray 来简化流程，当频繁的创建和销毁对象(对象的创建成本还比较大)时，会有一定的成本及比较差的体验(如内存抖动导致掉帧)。通过使用 Pool 来实现对 TypedArray 的缓存和复用，达到优化的目的。
+
+TypedArray 中还有很多类似 ```getDrawable``` 的方法用于从 TypedArray 中根据索引获取值，下面就看看 ```getDrawable``` 方法，源码如下：
+
+```java
+public Drawable getDrawable(@StyleableRes int index) {
+    if (mRecycled) {
+        throw new RuntimeException("Cannot make calls to a recycled instance!");
+    }
+
+    final TypedValue value = mValue;
+    if (getValueAt(index*AssetManager.STYLE_NUM_ENTRIES, value)) {
+        if (value.type == TypedValue.TYPE_ATTRIBUTE) {
+            throw new UnsupportedOperationException(
+                    "Failed to resolve attribute at index " + index + ": " + value);
+        }
+        return mResources.loadDrawable(value, value.resourceId, mTheme);
+    }
+    return null;
+}
+```
+
+首先是进行一系列判断，最后调用 ```mResources.loadDrawable``` 方法获取 drawable，这里调用的是 Resource 类的方法，```Resource.loadDrawable``` 又调用 ```ResourceImpl.loadDrawable``` 方法，所以看到 ```ResourceImpl.loadDrawable```：
+
+```java
+Drawable loadDrawable(Resources wrapper, TypedValue value, int id, Resources.Theme theme, boolean useCache) throws NotFoundException {
+    try {
+        // ...
+        // First, check whether we have a cached version of this drawable
+        // that was inflated against the specified theme. Skip the cache if
+        // we're currently preloading or we're not using the cache.
+        // 检查是否缓存有指定主题下这个版本的 drawable，
+        // 如果正在预加载或者不使用缓存，跳过此步
+        if (!mPreloading && useCache) {
+            final Drawable cachedDrawable = caches.getInstance(key, wrapper, theme);
+            if (cachedDrawable != null) {
+                return cachedDrawable;
+            }
+        }
+
+        // Next, check preloaded drawables. Preloaded drawables may contain
+        // unresolved theme attributes.
+        // 检查预加载过的 drawables。预加载的 drawables 可能包含没有解析的主题属性。
+        final Drawable.ConstantState cs;
+        if (isColorDrawable) {
+            cs = sPreloadedColorDrawables.get(key);
+        } else {
+            cs = sPreloadedDrawables[mConfiguration.getLayoutDirection()].get(key);
+        }
+
+        Drawable dr;
+        if (cs != null) {
+            dr = cs.newDrawable(wrapper);
+        } else if (isColorDrawable) {
+            dr = new ColorDrawable(value.data);
+        } else {
+            dr = loadDrawableForCookie(wrapper, value, id, null);
+        }
+
+        // Determine if the drawable has unresolved theme attributes. If it
+        // does, we'll need to apply a theme and store it in a theme-specific
+        // cache.
+        // 确定是否 drawable 有未解析的主题属性。
+        // 如果有则应用该主题到 drawable 并存储到特定的主题缓存中。
+        final boolean canApplyTheme = dr != null && dr.canApplyTheme();
+        if (canApplyTheme && theme != null) {
+            dr = dr.mutate();
+            dr.applyTheme(theme);
+            dr.clearMutated();
+        }
+
+        // If we were able to obtain a drawable, store it in the appropriate
+        // cache: preload, not themed, null theme, or theme-specific. Don't
+        // pollute the cache with drawables loaded from a foreign density.
+        // 如果拿到 drawable，将它存储到适当的缓存中：
+        // 比如 reload, not themed, null theme, or theme-specific
+        if (dr != null && useCache) {
+            dr.setChangingConfigurations(value.changingConfigurations);
+            cacheDrawable(value, isColorDrawable, caches, theme, canApplyTheme, key, dr);
+        }
+
+        return dr;
+    } catch (Exception e) {
+        // ...
+        final NotFoundException nfe = new NotFoundException("Drawable " + name
+                + " with resource ID #0x" + Integer.toHexString(id), e);
+        nfe.setStackTrace(new StackTraceElement[0]);
+        throw nfe;
+    }
+}
+```
+总结下来就是以下几步：
+
+1. 检查指定主题下是否缓存有这个版本的 drawable，如果正在预加载或者不使用缓存，进入下一步，否则返回这个 缓存的drawable；
+2. 检查预加载过的 drawables，预加载的 drawables 可能包含没有解析的主题属性；
+3. 确定是否 drawable 有未解析的主题属性。如果有则应用该主题到 drawable 并存储到特定的主题缓存中；
+4. 如果拿到 drawable，将它存储到适当的缓存中：比如 reload, not themed, null theme, or theme-specific，最后返回。
+
+以上就是通过 attribute 值代表的引用取得 drawable 的过程，获取其它资源也大同小异。
 
 ## 示例源码
 
