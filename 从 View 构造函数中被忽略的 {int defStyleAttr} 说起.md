@@ -251,7 +251,7 @@ static jboolean android_content_AssetManager_applyStyle(JNIEnv* env, jobject cla
 >
 >The indices used to retrieve values from this structure correspond to the positions of the attributes given to obtainStyledAttributes.
 
-注意上面[]起来的一句话：用完之后必须调用 ```recycle``` 方法。对，我们通常都会这么做，但是为什么要这么做？ 查看这个方法源码：
+注意上面用 [] 括起来的一句话：用完之后必须调用 ```recycle``` 方法。对，我们通常都会这么做，但是为什么要这么做？ 查看这个方法源码：
 
 ```java
 public void recycle() {
