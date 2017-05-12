@@ -247,11 +247,11 @@ static jboolean android_content_AssetManager_applyStyle(JNIEnv* env, jobject cla
 
 使用 TypedArray 类可以帮助我们简化获取 attribute 值的流程。类介绍也表明了其作用：
 
->ontainer for an array of values that were retrieved with ```Resources.Theme#obtainStyledAttributes``` or ```Resources#obtainAttributes```. ** Be sure to call ```recycle``` when done with them. **
+>ontainer for an array of values that were retrieved with ```Resources.Theme#obtainStyledAttributes``` or ```Resources#obtainAttributes```. [Be sure to call ```recycle``` when done with them.]
 >
 >The indices used to retrieve values from this structure correspond to the positions of the attributes given to obtainStyledAttributes.
 
-注意上面标重的一句话：用完之后必须调用 ```recycle``` 方法。对，我们通常都会这么做，但是为什么要这么做？ 查看这个方法源码：
+注意上面[]起来的一句话：用完之后必须调用 ```recycle``` 方法。对，我们通常都会这么做，但是为什么要这么做？ 查看这个方法源码：
 
 ```java
 public void recycle() {
@@ -281,7 +281,7 @@ static TypedArray obtain(Resources res, int len) {
         // 重置从 Pool 中获取到的对象
         return attrs;
     }
-	// 如果对象池是空，返回一个新对象
+    // 如果对象池是空，返回一个新对象
     return new TypedArray(res, new int[len*AssetManager.STYLE_NUM_ENTRIES], new int[1+len], len);
 }
 ```
@@ -306,8 +306,7 @@ public Drawable getDrawable(@StyleableRes int index) {
     final TypedValue value = mValue;
     if (getValueAt(index*AssetManager.STYLE_NUM_ENTRIES, value)) {
         if (value.type == TypedValue.TYPE_ATTRIBUTE) {
-            throw new UnsupportedOperationException(
-                    "Failed to resolve attribute at index " + index + ": " + value);
+            throw new UnsupportedOperationException("Failed to resolve attribute at index " + index + ": " + value);
         }
         return mResources.loadDrawable(value, value.resourceId, mTheme);
     }
